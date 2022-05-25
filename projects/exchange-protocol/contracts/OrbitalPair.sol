@@ -229,11 +229,13 @@ contract OrbitalPair is IOrbitalPair, OrbitalERC20 {
             address _token1 = token1;
             require(to != _token0 && to != _token1, 'Orbital: INVALID_TO');
             if (amount0Out > 0) {
-                _safeTransfer(_token0, controllerFeeAddress, feesAndAmounts.fee0); 
+                if (feesAndAmounts.fee0 > 0)
+                    _safeTransfer(_token0, controllerFeeAddress, feesAndAmounts.fee0); 
                 _safeTransfer(_token0, to, feesAndAmounts.amount0OutAfterFee);   // optimistically transfer tokens
             }
             if (amount1Out > 0) {
-                _safeTransfer(_token1, controllerFeeAddress, feesAndAmounts.fee1);
+                if (feesAndAmounts.fee1 > 0)
+                    _safeTransfer(_token1, controllerFeeAddress, feesAndAmounts.fee1);
                 _safeTransfer(_token1, to, feesAndAmounts.amount1OutAfterFee);   // optimistically transfer tokens
             }
             if (data.length > 0) 
@@ -266,9 +268,10 @@ contract OrbitalPair is IOrbitalPair, OrbitalERC20 {
     function _getFeesAndAmounts(uint256 amount0Out, uint256 amount1Out) private view returns (FeesAndAmounts memory) {
         uint256 fee0 = amount0Out.mul(controllerFeeShare) / 10000;
         uint256 fee1 = amount1Out.mul(controllerFeeShare) / 10000;
-        if (amount0Out > 0 && fee0 < 1) fee0 = 1;
-        if (amount1Out > 0 && fee1 < 1) fee1 = 1;
-
+        if (controllerFeeShare > 0) {
+            if (amount0Out > 0 && fee0 < 1) fee0 = 1;
+            if (amount1Out > 0 && fee1 < 1) fee1 = 1;
+        }
         return FeesAndAmounts(fee0, fee1, amount0Out - fee0, amount1Out - fee1);
     }
 

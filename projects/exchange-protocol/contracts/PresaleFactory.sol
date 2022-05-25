@@ -14,13 +14,13 @@ contract PresaleFactory is ReentrancyGuard, Ownable {
 
     enum PresaleStatuses { Started, Canceled, Finished }
 
-    uint constant public TOKEN_PRICE = 10000 * 10 ** 5;
-    uint constant public TOKEN_LISTING_PRICE = 9000 * 10 ** 5;
+    uint constant public TOKEN_PRICE = 5454 * 10 ** 5;
+    uint constant public TOKEN_LISTING_PRICE = 5000 * 10 ** 5;
     uint constant public LIQUIDITY_PERCENT = 51;
-    uint constant public HARD_CAP = 2000 ether;
-    uint constant public SOFT_CAP = 1000 ether;
-    uint constant public CONTRIBUTION_MIN = 0.1 ether;
-    uint constant public CONTRIBUTION_MAX = 10 ether;
+    uint constant public HARD_CAP = 4 ether;
+    uint constant public SOFT_CAP = 2 ether;
+    uint constant public CONTRIBUTION_MIN = 0.01 ether;
+    uint constant public CONTRIBUTION_MAX = 1 ether;
     
     address public wBNB;
     address public LPTokenTimeLock;
@@ -28,6 +28,7 @@ contract PresaleFactory is ReentrancyGuard, Ownable {
     uint public totalSold;
     uint public tokenReminder;
     uint immutable public startTime;
+    uint immutable public endTime;
     uint immutable public LPTokenLockUpTime;
     PresaleStatuses public status;
 
@@ -41,6 +42,7 @@ contract PresaleFactory is ReentrancyGuard, Ownable {
 
     constructor(
         uint _startTime,
+        uint _endTime,
         uint _LPTokenLockUpTime,
         IERC20 _presaleToken,
         address _orbitalRouter,
@@ -48,6 +50,7 @@ contract PresaleFactory is ReentrancyGuard, Ownable {
     )
     {
         startTime = _startTime;
+        endTime = _endTime;
         LPTokenLockUpTime = _LPTokenLockUpTime;
         presaleToken = _presaleToken;
         orbitalRouter = IOrbitalRouter02(_orbitalRouter);
@@ -61,6 +64,7 @@ contract PresaleFactory is ReentrancyGuard, Ownable {
         require(msg.value >= CONTRIBUTION_MIN, "TokenSale: Contribution amount is too low!");
         require(msg.value < CONTRIBUTION_MAX, "TokenSale: Contribution amount is too high!");
         require(block.timestamp > startTime, "TokenSale: Presale is not started yet!");
+        require(block.timestamp < endTime, "TokenSale: Presale is over!");
         require(address(this).balance <= HARD_CAP, "TokenSale: Hard cap was reached!");
         require(
             status != PresaleStatuses.Finished &&
@@ -69,14 +73,14 @@ contract PresaleFactory is ReentrancyGuard, Ownable {
         );
 
         if (funders[_msgSender()] == 0) {
-            funders[_msgSender()] = msg.value;
-        } else {
-            require(
-                funders[_msgSender()] + msg.value <= CONTRIBUTION_MAX,
-                "TokenSale: Contribution amount is too high, you was reached contribution maximum!"
-            );
-            funders[_msgSender()] += msg.value;
+            fundersCounter += 1;
         }
+        require(
+            funders[_msgSender()] + msg.value <= CONTRIBUTION_MAX,
+            "TokenSale: Contribution amount is too high, you was reached contribution maximum!"
+        );
+        funders[_msgSender()] += msg.value;
+        
         totalSold += msg.value * TOKEN_PRICE / 10 ** 18;
         emit Contribute(_msgSender(), msg.value);
     }
