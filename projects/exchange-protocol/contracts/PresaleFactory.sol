@@ -1,180 +1,117 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.4;
+pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "./interfaces/IOrbitalRouter02.sol";
 import "./interfaces/IOrbitalFactory.sol";
-import "./TokenTimelock.sol";
+import "./interfaces/IObitalPresale.sol";
 
 contract PresaleFactory is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
-    enum PresaleStatuses { Started, Canceled, Finished }
-
-    uint constant public TOKEN_PRICE = 5454 * 10 ** 5;
-    uint constant public TOKEN_LISTING_PRICE = 5000 * 10 ** 5;
-    uint constant public LIQUIDITY_PERCENT = 51;
-    uint constant public HARD_CAP = 4 ether;
-    uint constant public SOFT_CAP = 2 ether;
-    uint constant public CONTRIBUTION_MIN = 0.01 ether;
-    uint constant public CONTRIBUTION_MAX = 1 ether;
-    
-    address public wBNB;
-    address public LPTokenTimeLock;
-    uint public fundersCounter;
-    uint public totalSold;
-    uint public tokenReminder;
-    uint immutable public startTime;
-    uint immutable public endTime;
-    uint immutable public LPTokenLockUpTime;
-    PresaleStatuses public status;
-
-    mapping (address => uint) public funders;
-
-    IOrbitalRouter02 public orbitalRouter;
-    IOrbitalFactory private orbitalFactory;
-    IERC20 public presaleToken;
-
-    event Contribute(address funder, uint amount);
-
-    constructor(
-        uint _startTime,
-        uint _endTime,
-        uint _LPTokenLockUpTime,
-        IERC20 _presaleToken,
-        address _orbitalRouter,
-        address _wBNB
-    )
-    {
-        startTime = _startTime;
-        endTime = _endTime;
-        LPTokenLockUpTime = _LPTokenLockUpTime;
-        presaleToken = _presaleToken;
-        orbitalRouter = IOrbitalRouter02(_orbitalRouter);
-        address orbitalFactoryAddress = orbitalRouter.factory();
-        orbitalFactory = IOrbitalFactory(orbitalFactoryAddress);
-        wBNB = _wBNB;
+    struct FeeStruct {
+        uint256 ethFee;
+        uint256 tokenFee;
     }
 
-    function contribute() public payable nonReentrant
-    {
-        require(msg.value >= CONTRIBUTION_MIN, "TokenSale: Contribution amount is too low!");
-        require(msg.value < CONTRIBUTION_MAX, "TokenSale: Contribution amount is too high!");
-        require(block.timestamp > startTime, "TokenSale: Presale is not started yet!");
-        require(block.timestamp < endTime, "TokenSale: Presale is over!");
-        require(address(this).balance <= HARD_CAP, "TokenSale: Hard cap was reached!");
-        require(
-            status != PresaleStatuses.Finished &&
-            status != PresaleStatuses.Canceled,
-            "TokenSale: Presale is over!"
-        );
+    address public treasury;
+    FeeStruct[] public gFees;
+    uint256 public mintFee = 1 ether;
+    uint256 public emergencyFee = 200;
 
-        if (funders[_msgSender()] == 0) {
-            fundersCounter += 1;
-        }
-        require(
-            funders[_msgSender()] + msg.value <= CONTRIBUTION_MAX,
-            "TokenSale: Contribution amount is too high, you was reached contribution maximum!"
-        );
-        funders[_msgSender()] += msg.value;
+    address public implementation;
+    mapping(address => IObitalPresale.PresaleConfig) presales;
+
+    event UpdateImplementation(address impl);
+    event FeeAdded(uint256 id, uint256 ethFee, uint256 tokenFee);
+    event FeeUpdated(uint256 id, uint256 ethFee, uint256 tokenFee);
+    event SetMintFee(uint256 fee);
+
+    event PresaleCreated(address presale, address owner, IObitalPresale.PresaleConfig config, uint256 emergencyFee, uint256 ethFee, uint256 tokenFee);
+
+    constructor(address _implementation) {
+        implementation = _implementation;
+    }
+    
+    function createPresale(
+        address _op, 
+        address _uniRouter, 
+        address _token,
+        IObitalPresale.PresaleConfig memory _config,
+        uint256 _feeType
+    ) external payable returns (address presale) {
+        require(msg.value >= mintFee, "not enough fee");
+        require(gFees.length > _feeType, "Invalid fee type");
+        payable(treasury).transfer(mintFee);
         
-        totalSold += msg.value * TOKEN_PRICE / 10 ** 18;
-        emit Contribute(_msgSender(), msg.value);
-    }
+        uint256 tokenAmt = _config.hardcap * _config.price;
+        uint256 feeAmt = tokenAmt * gFees[_feeType].tokenFee;
+        tokenAmt = tokenAmt + tokenAmt * _config.liquidity_percent / 10000 + feeAmt;
 
-    function closePresale() public nonReentrant onlyOwner
-    {
-        require(status == PresaleStatuses.Started, "TokenSale: already closed");
-        _setPresaleStatus(PresaleStatuses.Canceled);
+        uint256 beforeAmt = IERC20(_token).balanceOf(address(this));
+        IERC20(_token).transferFrom(_msgSender(), address(this), tokenAmt);
+        uint256 afterAmt = IERC20(_token).balanceOf(address(this));
+        require(afterAmt - beforeAmt >= tokenAmt, "Fee is not excluded");
 
-        if (address(this).balance >= SOFT_CAP) {
-            _addLiquidityOnOrbital();
-            _lockLPTokens();
-            _setPresaleStatus(PresaleStatuses.Finished);
-        }
-    }
+        bytes32 salt = keccak256(abi.encodePacked(_op, _token, _feeType, block.timestamp));
+        presale = Clones.cloneDeterministic(implementation, salt);
+        IObitalPresale(presale).initialize(
+            _config, 
+            _uniRouter, 
+            _op, 
+            treasury, 
+            emergencyFee, 
+            gFees[_feeType].ethFee, 
+            gFees[_feeType].tokenFee
+        );
+        IERC20(_token).transfer(presale, tokenAmt);
 
-    function withdraw() public payable nonReentrant
-    {
-        require(status != PresaleStatuses.Started, "Launchpad: Presale is not finished");
-
-        if (_msgSender() == owner()){
-            if (status == PresaleStatuses.Finished) {
-                _safeTransfer(presaleToken, owner(), tokenReminder);
-                _safeTransferBNB(owner(), address(this).balance);
-            } else if (status == PresaleStatuses.Canceled) {
-                _safeTransfer(presaleToken, owner(), presaleToken.balanceOf(address(this)));
-            }
-        } else {
-            require(funders[_msgSender()] != 0, "Launchpad: You are not a funder!");
-            if (status == PresaleStatuses.Finished) {
-                uint amount = funders[_msgSender()] * TOKEN_PRICE / 10 ** 18;
-                funders[_msgSender()] = 0;
-                _safeTransfer(presaleToken, _msgSender(), amount);
-            } else if (status == PresaleStatuses.Canceled) {
-                uint amount = funders[_msgSender()];
-                funders[_msgSender()] = 0;
-                _safeTransferBNB(_msgSender(), amount);
-            }
-        }
-    }
-
-    receive() external payable {
-        _safeTransferBNB(owner(), msg.value);
+        presales[presale] = _config;
+        emit PresaleCreated(presale, _op, _config, emergencyFee, gFees[_feeType].ethFee, gFees[_feeType].tokenFee);
     }
     
-    function _addLiquidityOnOrbital() private returns(uint amountA, uint amountB, uint liquidity)
-    {
-        uint amountTokenDesired = address(this).balance * TOKEN_LISTING_PRICE * LIQUIDITY_PERCENT / 100 / 10 ** 18;
-        presaleToken.approve(address(orbitalRouter), amountTokenDesired);
-        tokenReminder = presaleToken.balanceOf(address(this)) - amountTokenDesired - totalSold;
+    function setImplementation(address _implementation) external onlyOwner {
+        require(_implementation != address(0x0), "invalid address");
 
-        uint amountBNB = address(this).balance * LIQUIDITY_PERCENT / 100;
-
-        (amountA, amountB, liquidity) = orbitalRouter.addLiquidityETH{value: amountBNB}(
-            address(presaleToken),
-            amountTokenDesired,
-            0,
-            0,
-            address(this),
-            2**255
-        );
+        implementation = _implementation;
+        emit UpdateImplementation(_implementation);
     }
 
-    function _lockLPTokens() private
-    {
-        address pair = orbitalFactory.getPair(address(presaleToken), wBNB);
-        IERC20 LPToken = IERC20(pair);
-        TokenTimelock contractInstance = new TokenTimelock(
-            LPToken,
-            owner(),
-            LPTokenLockUpTime
-        );
+    function addFee(uint256 _ethFee, uint256 _tokenFee) external onlyOwner {
+        require(_ethFee < 1000, "ethFee is too high");
+        require(_tokenFee < 1000, "tokenFee is too high");
 
-        LPTokenTimeLock = address(contractInstance);
+        gFees.push();
+        FeeStruct storage _fee = gFees[gFees.length - 1];
+        _fee.ethFee = _ethFee;
+        _fee.tokenFee = _tokenFee;
 
-        _safeTransfer(
-            LPToken,
-            LPTokenTimeLock,
-            LPToken.balanceOf(address(this))
-        );
+        emit FeeAdded(gFees.length - 1, _ethFee, _tokenFee);
     }
 
-    function _setPresaleStatus(PresaleStatuses _status) private
-    {
-        status = _status;
+    function updateFee(uint256 id, uint256 _ethFee, uint256 _tokenFee) external onlyOwner {
+        require(_ethFee < 1000, "ethFee is too high");
+        require(_tokenFee < 1000, "tokenFee is too high");
+
+        gFees.push();
+        FeeStruct storage _fee = gFees[id];
+        _fee.ethFee = _ethFee;
+        _fee.tokenFee = _tokenFee;
+
+        emit FeeUpdated(id, _ethFee, _tokenFee);
+    }
+    
+    function setFee(uint256 _fee) external onlyOwner {
+        mintFee = _fee;
+        emit SetMintFee(_fee);
     }
 
-    function _safeTransferBNB(address _to, uint _value) internal {
-        (bool success,) = _to.call{value:_value}(new bytes(0));
-        require(success, 'TransferHelper: BNB_TRANSFER_FAILED');
+    function setTreasury(address _treasury) external onlyOwner {
+        treasury = _treasury;
     }
 
-    function _safeTransfer(IERC20 _token, address _to, uint _amount) private
-    {
-        _token.safeTransfer(_to, _amount);
-    }
+    receive() external payable {}
 }
