@@ -2,21 +2,20 @@
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 // import "./interfaces/IOrbitalRouter02.sol";
 // import "./interfaces/IOrbitalFactory.sol";
-import "./TokenTimelock.sol";
+// import "./TokenTimelock.sol";
 
 contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
-    using SafeERC20 for ERC20;
+    using SafeERC20 for IERC20;
 
     bool initialized = false;
 
     address public presaleToken;
-    // ERC20 public BUSD = ERC20(0xe9e7cea3dedca5984780bafc599bd69add087d56); // BSC Mainnet
+    // ERC20 public BUSD = IERC20(0xe9e7cea3dedca5984780bafc599bd69add087d56); // BSC Mainnet
     address public BUSD = 0x37be299867CBE501140d95D4FD5d1a4c55969b7B; // BSC Testnet
 
     // address public wBNB;
@@ -42,7 +41,7 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
     }
     PresaleConfig public presaleConfig;
 
-    address public liquidityTimeLock;
+    // address public liquidityTimeLock;
     uint256 public totalSold;
     // uint256 public tokenReminder;
     PresaleStatus public status;
@@ -92,11 +91,11 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
     function initialize(
         PresaleConfig memory _config,
         // address _orbitalRouter,
-        address _owner,
+        address _owner
         // address _treasury,
         // uint256 _ethFee,
         // uint256 _tokenFee
-        uint256 _emergencyFee
+        // uint256 _emergencyFee
     ) external {
         require(!initialized, "already initialized");
         require(owner() == address(0x0) || _msgSender() == owner(), "not allowed");
@@ -117,7 +116,7 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         // }
 
         // treasury = _treasury;
-        emergencyFee = _emergencyFee;
+        // emergencyFee = _emergencyFee;
         // ethFee = _ethFee;
         // tokenFee = _tokenFee;
 
@@ -139,7 +138,7 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
             "TokenSale: Contribution amount is too high, you was reached contribution maximum!"
         );
 
-        ERC20(BUSD).safeTransferFrom(_msgSender(), address(this), _amount);
+        IERC20(BUSD).safeTransferFrom(_msgSender(), address(this), _amount);
 
         if (funder.amount == 0 && funder.status == FunderStatus.None) {
             funderCounter++;
@@ -284,7 +283,7 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
     // }
 
     // function _lockLPTokens() internal {
-    //     ERC20 LPToken = ERC20(pair);
+    //     ERC20 LPToken = IERC20(pair);
     //     TokenTimelock contractInstance = new TokenTimelock(
     //         LPToken,
     //         owner(),
@@ -309,7 +308,7 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
 
     function _safeTransferBUSD(address _to, uint256 _value) internal {
         require(_value > 0);
-        ERC20(BUSD).safeTransfer(_to, _value);
+        IERC20(BUSD).safeTransfer(_to, _value);
         // (bool success, ) = _to.call{value: _value}(new bytes(0));
         // require(success, "TransferHelper: BNB_TRANSFER_FAILED");
     }
@@ -319,7 +318,7 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         address _to,
         uint256 _amount
     ) internal {
-        ERC20(_token).safeTransfer(_to, _amount);
+        IERC20(_token).safeTransfer(_to, _amount);
     }
 
     function adminWithdraw(
@@ -327,6 +326,6 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         address _to,
         uint256 _amount
     ) external onlyOwner {
-        ERC20(_token).safeTransfer(_to, _amount);
+        IERC20(_token).safeTransfer(_to, _amount);
     }
 }

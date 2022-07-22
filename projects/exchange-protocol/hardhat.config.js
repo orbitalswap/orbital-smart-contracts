@@ -71,7 +71,7 @@ module.exports = {
     bsc_testnet: {
       url:  `https://data-seed-prebsc-1-s1.binance.org:8545/`,
       chainId: 97,
-      //gasPrice: 20000000000,
+      gasPrice: 20000000000,
       accounts: [`0x${accountPrivateKey}`]
     },
 
@@ -86,7 +86,14 @@ module.exports = {
   etherscan: {
     // Your API key for Etherscan
     // Obtain one at https://etherscan.io/
-    apiKey: APIKey
+    apiKey: {
+      rinkeby: 'XFAGSFB6UXE9MFTA9AHJMGHMXI8IXRVCHW',
+      ropsten: 'XFAGSFB6UXE9MFTA9AHJMGHMXI8IXRVCHW',
+      bsc: 'A263TZTNDWUC9NKI1AMBVJJC8H3SA547AF',
+      bscTestnet: 'A263TZTNDWUC9NKI1AMBVJJC8H3SA547AF',
+      avalanche: 'WN8CWW97AHIYUBC665Y4HZ4E5V4GUJZR2Y',
+      avalancheFujiTestnet: 'WN8CWW97AHIYUBC665Y4HZ4E5V4GUJZR2Y',
+    },
   },
 
   solidity: {
@@ -138,7 +145,5 @@ module.exports = {
       },
     ]
   },
-  etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY
-  }
+  
 }
