@@ -7,7 +7,7 @@ const {
   infuraProjectId,
   accountPrivateKey,
   APIKey,
-  alchemyApi
+  // alchemyApi
 } = require(__dirname+'/.secrets.js');
 
 module.exports = {
@@ -19,9 +19,9 @@ module.exports = {
       accounts: [
         {privateKey: `0x${accountPrivateKey}`, balance: "99991229544000000000000"},
       ],
-      forking: {
-          url: "https://eth-kovan.alchemyapi.io/v2/"+alchemyApi
-      },
+      // forking: {
+      //     url: "https://eth-kovan.alchemyapi.io/v2/"+alchemyApi
+      // },
 
       chainId: 31337,
       loggingEnabled: false,
