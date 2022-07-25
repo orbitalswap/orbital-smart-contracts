@@ -18,11 +18,11 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         Finished
     }
 
-    uint256 public constant TOKEN_PRICE = 3333 * 10**5;
-    uint256 public constant HARD_CAP = 10000 ether;
-    uint256 public constant SOFT_CAP = 5000 ether;
-    uint256 public constant CONTRIBUTION_MIN = 1 ether;
-    uint256 public constant CONTRIBUTION_MAX = 3000 ether;
+    uint256 public constant TOKEN_PRICE = 25 * 10**16;
+    uint256 public constant HARD_CAP = 100000 ether;
+    uint256 public constant SOFT_CAP = 2000 ether;
+    uint256 public constant CONTRIBUTION_MIN = 100 ether;
+    uint256 public constant CONTRIBUTION_MAX = 50000 ether;
     uint256 public immutable startTime;
     uint256 public immutable endTime;
 
@@ -42,8 +42,9 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
 
     struct ContributeData {
         uint256 amount;
-        uint256 claimed_amount;
-        uint256 first_claim_time;
+        uint256 totalClaimAmount;
+        uint256 claimedAmount;
+        uint256 claimedTime;
         FunderStatus status;
     }
 
@@ -51,7 +52,7 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
     uint256 public fundersCounter;
     uint256 public FIRST_CLAIM_PERCENT = 40;
     uint256 public PERIOD_CLAIM_PERCENT = 5;
-    uint256 public CLAIM_PERIOD = 7 * 24 * 3600; // one week
+    uint256 public CLAIM_PERIOD = 300; // one week
 
     uint256 public emergencyFee = 200;
 
@@ -77,7 +78,7 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         require(_amount <= CONTRIBUTION_MAX, "TokenSale: Contribution amount is too high!");
         require(block.timestamp > startTime, "TokenSale: Presale is not started yet!");
         require(block.timestamp < endTime, "TokenSale: Presale is over!");
-        require(IERC20(BUSD).balanceOf(address(this)) <= HARD_CAP, "TokenSale: Hard cap was reached!");
+        require(IERC20(BUSD).balanceOf(address(this)) + _amount <= HARD_CAP, "TokenSale: Hard cap was reached!");
         require(status != PresaleStatuses.Finished, "TokenSale: Presale is over!");
         require(
             funders[_msgSender()].amount + _amount <= CONTRIBUTION_MAX,
@@ -91,6 +92,7 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         }
 
         funder.amount += _amount;
+        funder.totalClaimAmount += (_amount * TOKEN_PRICE) / 1e18;
         funder.status = FunderStatus.Invested;
 
         totalSold += (_amount * TOKEN_PRICE) / 10**18;
@@ -108,40 +110,48 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         //         _safeTransfer(presaleToken, owner(), presaleToken.balanceOf(address(this)));
         //     }
         // } else {
-        ContributeData storage funder = funders[_msgSender()];
+
+        require(funders[_msgSender()].amount > 0, "Launchpad: You are not a funder!");
+
         require(
-            funder.amount > 0 &&
-                funder.amount > funder.claimed_amount &&
-                (funder.status == FunderStatus.Invested || funder.status == FunderStatus.Claimed),
-            "Launchpad: You are not a funder!"
+            funders[_msgSender()].totalClaimAmount > funders[_msgSender()].claimedAmount &&
+                (funders[_msgSender()].status == FunderStatus.Invested ||
+                    funders[_msgSender()].status == FunderStatus.Claimed),
+            "You already claimed total amount"
         );
 
         if (status == PresaleStatuses.Finished) {
-            if (funder.status == FunderStatus.Invested) {
+            if (funders[_msgSender()].status == FunderStatus.Invested) {
                 // First claim - 40%
-                uint256 amount = (FIRST_CLAIM_PERCENT * funder.amount * TOKEN_PRICE) / 100 / 1e18;
-                funder.claimed_amount += amount;
-                funder.first_claim_time = block.timestamp;
-                funder.status = FunderStatus.Claimed;
+                uint256 amount = (FIRST_CLAIM_PERCENT * funders[_msgSender()].amount * TOKEN_PRICE) / 100 / 1e18;
+                funders[_msgSender()].claimedAmount += amount;
+                funders[_msgSender()].claimedTime = block.timestamp;
+                funders[_msgSender()].status = FunderStatus.Claimed;
                 _safeTransfer(presaleToken, _msgSender(), amount);
                 emit Claimed(_msgSender(), amount);
-            } else if (funder.status == FunderStatus.Claimed) {
+            } else if (funders[_msgSender()].status == FunderStatus.Claimed) {
                 // Can claim 5% every week
                 require(
-                    funder.first_claim_time + CLAIM_PERIOD > block.timestamp,
+                    funders[_msgSender()].claimedTime + CLAIM_PERIOD < block.timestamp,
                     "Can claim after week of first claimed"
                 );
-                uint256 period_claim_count = (block.timestamp - funder.first_claim_time) / CLAIM_PERIOD;
-                uint256 amount = (PERIOD_CLAIM_PERCENT * period_claim_count * funder.amount * TOKEN_PRICE) / 100 / 1e18;
-                funder.claimed_amount += amount;
-
+                uint256 period_claim_count = (block.timestamp - funders[_msgSender()].claimedTime) / CLAIM_PERIOD;
+                if (period_claim_count > 100 - FIRST_CLAIM_PERCENT) period_claim_count = 100 - FIRST_CLAIM_PERCENT;
+                uint256 amount = (PERIOD_CLAIM_PERCENT *
+                    period_claim_count *
+                    funders[_msgSender()].amount *
+                    TOKEN_PRICE) /
+                    100 /
+                    1e18;
+                funders[_msgSender()].claimedAmount += amount;
+                funders[_msgSender()].claimedTime = block.timestamp;
                 _safeTransfer(presaleToken, _msgSender(), amount);
                 emit Claimed(_msgSender(), amount);
             }
         } else if (status == PresaleStatuses.Canceled) {
-            uint256 amount = funder.amount;
-            funder.amount = 0;
-            funder.status = FunderStatus.Refunded;
+            uint256 amount = funders[_msgSender()].amount;
+            funders[_msgSender()].amount = 0;
+            funders[_msgSender()].status = FunderStatus.Refunded;
             _safeTransferBUSD(_msgSender(), amount);
             emit Withdrawn(_msgSender(), amount);
         }

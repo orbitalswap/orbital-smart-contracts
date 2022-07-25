@@ -12,7 +12,7 @@ async function main() {
     1658848129,
     "0x1e957dec5960478f2dbef5cca2f82fe0bdd11911"
   );
-  console.log("ObitalPresaleBUSDDeployed.address", ObitalPresaleBUSDDeployed.address);
+  // console.log("ObitalPresaleBUSDDeployed.address", ObitalPresaleBUSDDeployed.address);
   return ObitalPresaleBUSDDeployed.address;
 }
 
@@ -27,4 +27,4 @@ main()
   });
 
 // npx hardhat run --network bsc_testnet deploy/deploy_presaleBUSD.js
-// npx hardhat verify --network bsc_testnet
+// npx hardhat verify --network bsc_testnet 0x87681e77eb02982eD5ff04C50f94971DD7909FAB 1658638129 1658848129 0x1e957dec5960478f2dbef5cca2f82fe0bdd11911
