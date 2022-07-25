@@ -7,7 +7,11 @@ async function main() {
   console.log("Account balance:", (await deployer.getBalance()).toString());
 
   const ObitalPresaleBUSD = await hre.ethers.getContractFactory("ObitalPresaleBUSD");
-  const ObitalPresaleBUSDDeployed = await ObitalPresaleBUSD.deploy();
+  const ObitalPresaleBUSDDeployed = await ObitalPresaleBUSD.deploy(
+    1658638129,
+    1658848129,
+    "0x1e957dec5960478f2dbef5cca2f82fe0bdd11911"
+  );
   console.log("ObitalPresaleBUSDDeployed.address", ObitalPresaleBUSDDeployed.address);
   return ObitalPresaleBUSDDeployed.address;
 }
@@ -23,4 +27,4 @@ main()
   });
 
 // npx hardhat run --network bsc_testnet deploy/deploy_presaleBUSD.js
-// npx hardhat verify --network bsc_testnet 
+// npx hardhat verify --network bsc_testnet
