@@ -121,9 +121,10 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         );
 
         if (status == PresaleStatuses.Finished) {
+            uint256 totalWithdrawableAmount = (funders[_msgSender()].amount * TOKEN_PRICE) / 1e18;
             if (funders[_msgSender()].status == FunderStatus.Invested) {
                 // First claim - 40%
-                uint256 amount = (FIRST_CLAIM_PERCENT * funders[_msgSender()].amount * TOKEN_PRICE) / 100 / 1e18;
+                uint256 amount = (FIRST_CLAIM_PERCENT * totalWithdrawableAmount) / 100;
                 funders[_msgSender()].claimedAmount += amount;
                 funders[_msgSender()].claimedTime = block.timestamp;
                 funders[_msgSender()].status = FunderStatus.Claimed;
@@ -135,14 +136,16 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
                     funders[_msgSender()].claimedTime + CLAIM_PERIOD < block.timestamp,
                     "Can claim after week of first claimed"
                 );
-                uint256 period_claim_count = (block.timestamp - funders[_msgSender()].claimedTime) / CLAIM_PERIOD;
-                if (period_claim_count > 100 - FIRST_CLAIM_PERCENT) period_claim_count = 100 - FIRST_CLAIM_PERCENT;
+                uint256 periodClaimPercent = (block.timestamp - funders[_msgSender()].claimedTime) / CLAIM_PERIOD;
+                if (periodClaimPercent > 100 - FIRST_CLAIM_PERCENT) periodClaimPercent = 100 - FIRST_CLAIM_PERCENT;
                 uint256 amount = (PERIOD_CLAIM_PERCENT *
-                    period_claim_count *
+                    periodClaimPercent *
                     funders[_msgSender()].amount *
                     TOKEN_PRICE) /
                     100 /
                     1e18;
+                if (funders[_msgSender()].claimedAmount + amount > totalWithdrawableAmount)
+                    amount = totalWithdrawableAmount - funders[_msgSender()].claimedAmount;
                 funders[_msgSender()].claimedAmount += amount;
                 funders[_msgSender()].claimedTime = block.timestamp;
                 _safeTransfer(presaleToken, _msgSender(), amount);
