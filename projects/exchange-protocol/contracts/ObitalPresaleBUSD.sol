@@ -132,18 +132,14 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
                 emit Claimed(_msgSender(), amount);
             } else if (funders[_msgSender()].status == FunderStatus.Claimed) {
                 // Can claim 5% every week
+                require(totalWithdrawableAmount > funders[_msgSender()].claimedAmount, "Already claimed all");
                 require(
                     funders[_msgSender()].claimedTime + CLAIM_PERIOD < block.timestamp,
                     "Can claim after week of first claimed"
                 );
                 uint256 periodClaimPercent = (block.timestamp - funders[_msgSender()].claimedTime) / CLAIM_PERIOD;
                 if (periodClaimPercent > 100 - FIRST_CLAIM_PERCENT) periodClaimPercent = 100 - FIRST_CLAIM_PERCENT;
-                uint256 amount = (PERIOD_CLAIM_PERCENT *
-                    periodClaimPercent *
-                    funders[_msgSender()].amount *
-                    TOKEN_PRICE) /
-                    100 /
-                    1e18;
+                uint256 amount = (PERIOD_CLAIM_PERCENT * periodClaimPercent * totalWithdrawableAmount) / 100;
                 if (funders[_msgSender()].claimedAmount + amount > totalWithdrawableAmount)
                     amount = totalWithdrawableAmount - funders[_msgSender()].claimedAmount;
                 funders[_msgSender()].claimedAmount += amount;
