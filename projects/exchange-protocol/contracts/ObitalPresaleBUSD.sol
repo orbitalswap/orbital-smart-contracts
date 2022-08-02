@@ -92,10 +92,10 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         }
 
         funder.amount += _amount;
-        funder.totalClaimAmount += (_amount * TOKEN_PRICE) / 1e18;
+        funder.totalClaimAmount += (_amount * 1e18) / TOKEN_PRICE;
         funder.status = FunderStatus.Invested;
 
-        totalSold += (_amount * TOKEN_PRICE) / 10**18;
+        totalSold += (_amount * 1e18) / TOKEN_PRICE;
         IERC20(BUSD).safeTransferFrom(_msgSender(), address(this), _amount);
         emit Contribute(_msgSender(), _amount);
     }
@@ -121,7 +121,7 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         );
 
         if (status == PresaleStatuses.Finished) {
-            uint256 totalWithdrawableAmount = (funders[_msgSender()].amount * TOKEN_PRICE) / 1e18;
+            uint256 totalWithdrawableAmount = (funders[_msgSender()].amount * 1e18) / TOKEN_PRICE;
             if (funders[_msgSender()].status == FunderStatus.Invested) {
                 // First claim - 40%
                 uint256 amount = (FIRST_CLAIM_PERCENT * totalWithdrawableAmount) / 100;
@@ -172,7 +172,7 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         funder.amount = 0;
         funder.status = FunderStatus.EmergencyWithdrawn;
 
-        totalSold = totalSold - (funder.amount * TOKEN_PRICE) / 1e18;
+        totalSold = totalSold - (funder.amount * 1e18) / TOKEN_PRICE;
 
         if (emergencyFee > 0) {
             uint256 fee = (amount * emergencyFee) / 10000;
