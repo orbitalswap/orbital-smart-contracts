@@ -10,7 +10,7 @@ async function main() {
   const ObitalPresaleBUSDDeployed = await ObitalPresaleBUSD.deploy(
     1659424433,
     1669424433,
-    "0x1e957dec5960478f2dbef5cca2f82fe0bdd11911"
+    "0xA8929a655303AB9f236C1CAa3C21c44F8204adB8"
   );
   // console.log("ObitalPresaleBUSDDeployed.address", ObitalPresaleBUSDDeployed.address);
   return ObitalPresaleBUSDDeployed.address;
@@ -27,4 +27,4 @@ main()
   });
 
 // npx hardhat run --network bsc_testnet deploy/deploy_presaleBUSD.js
-// npx hardhat verify --network bsc_testnet 0x781f5A8F1EfCaC13711d7A1253D40edf54F1124E 1659424433 1669424433 0x1e957dec5960478f2dbef5cca2f82fe0bdd11911
+// npx hardhat verify --network bsc_testnet 0xA8929a655303AB9f236C1CAa3C21c44F8204adB8 1659424433 1669424433 0x1e957dec5960478f2dbef5cca2f82fe0bdd11911

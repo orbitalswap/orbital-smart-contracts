@@ -18,9 +18,9 @@ contract ObitalPresaleBUSD is ReentrancyGuard, Ownable {
         Finished
     }
 
-    uint256 public constant TOKEN_PRICE = 25 * 10**16;
+    uint256 public constant TOKEN_PRICE = 4 * 10**16;
     uint256 public constant HARD_CAP = 100000 ether;
-    uint256 public constant SOFT_CAP = 2000 ether;
+    uint256 public constant SOFT_CAP = 50000 ether;
     uint256 public constant CONTRIBUTION_MIN = 100 ether;
     uint256 public constant CONTRIBUTION_MAX = 50000 ether;
     uint256 public immutable startTime;
